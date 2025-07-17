@@ -2,11 +2,11 @@ package goatest
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -16,13 +16,66 @@ import (
 type Process struct {
 	File       string
 	Env        map[string]string
+	EnvFile    string
 	LogStream  io.Writer
 	WaitingFor func(string) bool
 
 	// private fields for internal state
-	cmd     *exec.Cmd
-	mu      sync.Mutex
-	running bool
+	cmd        *exec.Cmd
+	mu         sync.Mutex
+	running    bool
+	safeWriter *threadSafeWriter
+}
+
+// GetOutput returns the complete captured output
+func (r *Process) GetOutput() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.safeWriter != nil {
+		return r.safeWriter.getOutput()
+	}
+	return ""
+}
+
+// GetLines returns all captured output lines
+func (r *Process) GetLines() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.safeWriter != nil {
+		return r.safeWriter.getLines()
+	}
+	return nil
+}
+
+// ContainsOutput checks if the output contains the given string
+func (r *Process) ContainsOutput(text string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.safeWriter != nil {
+		return r.safeWriter.containsOutput(text)
+	}
+	return false
+}
+
+// WaitForOutput waits for specific output to appear (with timeout)
+func (r *Process) WaitForOutput(text string, timeout time.Duration) bool {
+	r.mu.Lock()
+	safeWriter := r.safeWriter
+	r.mu.Unlock()
+
+	if safeWriter != nil {
+		return safeWriter.waitForOutput(text, timeout)
+	}
+	return false
+}
+
+// ResetOutput clears the captured output
+func (r *Process) ResetOutput() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.safeWriter != nil {
+		r.safeWriter.reset()
+	}
 }
 
 // Run starts the Go process in the background
@@ -43,6 +96,16 @@ func (r *Process) Run() error {
 		r.Env = make(map[string]string)
 	}
 
+	// Load environment variables from EnvFile if specified
+	if r.EnvFile != "" {
+		if err := r.loadEnvFile(); err != nil {
+			return fmt.Errorf("failed to load env file: %w", err)
+		}
+	}
+
+	// Wrap LogStream with thread-safe wrapper
+	r.safeWriter = newThreadSafeWriter(r.LogStream)
+
 	// Build the go run command
 	r.cmd = exec.Command("go", "run", r.File)
 
@@ -61,10 +124,6 @@ func (r *Process) Run() error {
 	r.cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
-
-	// Setup output handling
-	var outputBuffer bytes.Buffer
-	var bufferMu sync.Mutex
 
 	// Create pipes for stdout and stderr
 	stdoutPipe, err := r.cmd.StdoutPipe()
@@ -88,18 +147,13 @@ func (r *Process) Run() error {
 
 	// Function to handle output lines
 	handleLine := func(line string) {
-		bufferMu.Lock()
-		outputBuffer.WriteString(line)
-		currentOutput := outputBuffer.String()
-		bufferMu.Unlock()
-
-		// Write to log stream if configured
-		if r.LogStream != nil {
-			_, _ = r.LogStream.Write([]byte(line))
+		// Write to thread-safe writer (which handles LogStream internally)
+		if r.safeWriter != nil {
+			_, _ = r.safeWriter.Write([]byte(line))
 		}
 
-		// Check waiting condition if set
-		if r.WaitingFor != nil && r.WaitingFor(currentOutput) {
+		// Check waiting condition if set using the thread-safe writer's output
+		if r.WaitingFor != nil && r.safeWriter != nil && r.WaitingFor(r.safeWriter.getOutput()) {
 			select {
 			case readyChan <- true:
 			default:
@@ -126,8 +180,8 @@ func (r *Process) Run() error {
 	// Wait for the condition if specified
 	if r.WaitingFor != nil {
 		// Log that we're waiting for readiness
-		if r.LogStream != nil {
-			_, _ = r.LogStream.Write([]byte("[runner] Waiting for the readiness.\n"))
+		if r.safeWriter != nil {
+			_, _ = r.safeWriter.Write([]byte("[runner] Waiting for the readiness.\n"))
 		}
 
 		select {
@@ -169,4 +223,42 @@ func (r *Process) Stop() {
 	}
 
 	r.running = false
+}
+
+// loadEnvFile loads environment variables from a .env file
+func (r *Process) loadEnvFile() error {
+	file, err := os.Open(r.EnvFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		
+		// Skip empty lines and comments
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		
+		// Split by first = to handle values with = in them
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		
+		// Remove quotes if present
+		if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
+			(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
+			value = value[1 : len(value)-1]
+		}
+		
+		r.Env[key] = value
+	}
+	
+	return scanner.Err()
 }
