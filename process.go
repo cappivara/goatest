@@ -236,32 +236,32 @@ func (p *Process) loadEnvFile() error {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		// Skip empty lines and comments
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		
+
 		// Split by first = to handle values with = in them
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		
+
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
-		
+
 		// Remove quotes if present
 		if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
 			(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
 			value = value[1 : len(value)-1]
 		}
-		
+
 		// Only set if key doesn't already exist (Env should override EnvFile)
 		if _, exists := p.Env[key]; !exists {
 			p.Env[key] = value
 		}
 	}
-	
+
 	return scanner.Err()
 }
