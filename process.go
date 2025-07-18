@@ -28,40 +28,40 @@ type Process struct {
 }
 
 // GetOutput returns the complete captured output
-func (r *Process) GetOutput() string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.safeWriter != nil {
-		return r.safeWriter.getOutput()
+func (p *Process) GetOutput() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.safeWriter != nil {
+		return p.safeWriter.getOutput()
 	}
 	return ""
 }
 
 // GetLines returns all captured output lines
-func (r *Process) GetLines() []string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.safeWriter != nil {
-		return r.safeWriter.getLines()
+func (p *Process) GetLines() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.safeWriter != nil {
+		return p.safeWriter.getLines()
 	}
 	return nil
 }
 
 // ContainsOutput checks if the output contains the given string
-func (r *Process) ContainsOutput(text string) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.safeWriter != nil {
-		return r.safeWriter.containsOutput(text)
+func (p *Process) ContainsOutput(text string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.safeWriter != nil {
+		return p.safeWriter.containsOutput(text)
 	}
 	return false
 }
 
 // WaitForOutput waits for specific output to appear (with timeout)
-func (r *Process) WaitForOutput(text string, timeout time.Duration) bool {
-	r.mu.Lock()
-	safeWriter := r.safeWriter
-	r.mu.Unlock()
+func (p *Process) WaitForOutput(text string, timeout time.Duration) bool {
+	p.mu.Lock()
+	safeWriter := p.safeWriter
+	p.mu.Unlock()
 
 	if safeWriter != nil {
 		return safeWriter.waitForOutput(text, timeout)
@@ -70,77 +70,77 @@ func (r *Process) WaitForOutput(text string, timeout time.Duration) bool {
 }
 
 // ResetOutput clears the captured output
-func (r *Process) ResetOutput() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if r.safeWriter != nil {
-		r.safeWriter.reset()
+func (p *Process) ResetOutput() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.safeWriter != nil {
+		p.safeWriter.reset()
 	}
 }
 
 // Run starts the Go process in the background
-func (r *Process) Run() error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (p *Process) Run() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	if r.running {
+	if p.running {
 		return nil
 	}
 
-	if r.File == "" {
+	if p.File == "" {
 		return fmt.Errorf("no file specified")
 	}
 
 	// Initialize Env map if nil
-	if r.Env == nil {
-		r.Env = make(map[string]string)
+	if p.Env == nil {
+		p.Env = make(map[string]string)
 	}
 
 	// Load environment variables from EnvFile if specified
-	if r.EnvFile != "" {
-		if err := r.loadEnvFile(); err != nil {
+	if p.EnvFile != "" {
+		if err := p.loadEnvFile(); err != nil {
 			return fmt.Errorf("failed to load env file: %w", err)
 		}
 	}
 
 	// Wrap LogStream with thread-safe wrapper
-	r.safeWriter = newThreadSafeWriter(r.LogStream)
+	p.safeWriter = newThreadSafeWriter(p.LogStream)
 
 	// Build the go run command
-	r.cmd = exec.Command("go", "run", r.File)
+	p.cmd = exec.Command("go", "run", p.File)
 
 	// Set environment variables
-	r.cmd.Env = os.Environ()
-	for k, v := range r.Env {
-		r.cmd.Env = append(r.cmd.Env, k+"="+v)
+	p.cmd.Env = os.Environ()
+	for k, v := range p.Env {
+		p.cmd.Env = append(p.cmd.Env, k+"="+v)
 	}
 
 	// Set working directory to the current directory (runner)
 	if wd, err := os.Getwd(); err == nil {
-		r.cmd.Dir = wd
+		p.cmd.Dir = wd
 	}
 
 	// Set process group to enable killing the entire process tree
-	r.cmd.SysProcAttr = &syscall.SysProcAttr{
+	p.cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
 
 	// Create pipes for stdout and stderr
-	stdoutPipe, err := r.cmd.StdoutPipe()
+	stdoutPipe, err := p.cmd.StdoutPipe()
 	if err != nil {
 		return err
 	}
-	stderrPipe, err := r.cmd.StderrPipe()
+	stderrPipe, err := p.cmd.StderrPipe()
 	if err != nil {
 		return err
 	}
 
 	// Start the process
-	if err := r.cmd.Start(); err != nil {
+	if err := p.cmd.Start(); err != nil {
 		return err
 	}
 
-	r.running = true
+	p.running = true
 
 	// Channel to signal when the waiting condition is met
 	readyChan := make(chan bool, 1)
@@ -148,12 +148,12 @@ func (r *Process) Run() error {
 	// Function to handle output lines
 	handleLine := func(line string) {
 		// Write to thread-safe writer (which handles LogStream internally)
-		if r.safeWriter != nil {
-			_, _ = r.safeWriter.Write([]byte(line))
+		if p.safeWriter != nil {
+			_, _ = p.safeWriter.Write([]byte(line))
 		}
 
 		// Check waiting condition if set using the thread-safe writer's output
-		if r.WaitingFor != nil && r.safeWriter != nil && r.WaitingFor(r.safeWriter.getOutput()) {
+		if p.WaitingFor != nil && p.safeWriter != nil && p.WaitingFor(p.safeWriter.getOutput()) {
 			select {
 			case readyChan <- true:
 			default:
@@ -178,10 +178,10 @@ func (r *Process) Run() error {
 	}()
 
 	// Wait for the condition if specified
-	if r.WaitingFor != nil {
+	if p.WaitingFor != nil {
 		// Log that we're waiting for readiness
-		if r.safeWriter != nil {
-			_, _ = r.safeWriter.Write([]byte("[runner] Waiting for the readiness.\n"))
+		if p.safeWriter != nil {
+			_, _ = p.safeWriter.Write([]byte("[runner] Waiting for the readiness.\n"))
 		}
 
 		select {
@@ -194,40 +194,40 @@ func (r *Process) Run() error {
 
 	// Continue running the process in background
 	go func() {
-		_ = r.cmd.Wait()
+		_ = p.cmd.Wait()
 	}()
 
 	return nil
 }
 
 // Stop terminates the background process
-func (r *Process) Stop() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (p *Process) Stop() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	if !r.running || r.cmd == nil {
+	if !p.running || p.cmd == nil {
 		return
 	}
 
 	// Kill the entire process group to ensure child processes are also terminated
-	if r.cmd.Process != nil {
+	if p.cmd.Process != nil {
 		// Get the process group ID
-		pgid, err := syscall.Getpgid(r.cmd.Process.Pid)
+		pgid, err := syscall.Getpgid(p.cmd.Process.Pid)
 		if err == nil {
 			// Kill the entire process group (negative PID means process group)
 			_ = syscall.Kill(-pgid, syscall.SIGKILL)
 		} else {
 			// Fallback: kill just the main process
-			_ = r.cmd.Process.Kill()
+			_ = p.cmd.Process.Kill()
 		}
 	}
 
-	r.running = false
+	p.running = false
 }
 
 // loadEnvFile loads environment variables from a .env file
-func (r *Process) loadEnvFile() error {
-	file, err := os.Open(r.EnvFile)
+func (p *Process) loadEnvFile() error {
+	file, err := os.Open(p.EnvFile)
 	if err != nil {
 		return err
 	}
@@ -258,8 +258,8 @@ func (r *Process) loadEnvFile() error {
 		}
 		
 		// Only set if key doesn't already exist (Env should override EnvFile)
-		if _, exists := r.Env[key]; !exists {
-			r.Env[key] = value
+		if _, exists := p.Env[key]; !exists {
+			p.Env[key] = value
 		}
 	}
 	
