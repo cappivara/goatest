@@ -257,7 +257,10 @@ func (r *Process) loadEnvFile() error {
 			value = value[1 : len(value)-1]
 		}
 		
-		r.Env[key] = value
+		// Only set if key doesn't already exist (Env should override EnvFile)
+		if _, exists := r.Env[key]; !exists {
+			r.Env[key] = value
+		}
 	}
 	
 	return scanner.Err()

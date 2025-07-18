@@ -274,4 +274,33 @@ func TestProcess(t *testing.T) {
 			t.Fatalf("expected lines to be cleared after reset, got: %v", r.GetLines())
 		}
 	})
+
+	t.Run("env should override envfile", func(t *testing.T) {
+		r := goatest.Process{
+			File: "test/cmd/rest_api/main.go",
+			Env: map[string]string{
+				"PORT": "1016", // This should override the PORT=9999 from .env file
+			},
+			EnvFile:   "test/data/.env", // Contains PORT=9999
+			LogStream: nil,
+			WaitingFor: func(output string) bool {
+				return strings.Contains(output, "Server is running on port 1016")
+			},
+		}
+
+		if err := r.Run(); err != nil {
+			t.Fatalf("failed to run: %v", err)
+		}
+		defer r.Stop()
+
+		// Verify that the Env variable (1016) overrode the EnvFile variable (9999)
+		if !r.ContainsOutput("Server is running on port 1016") {
+			t.Fatalf("expected Env to override EnvFile, got output: %s", r.GetOutput())
+		}
+
+		// Ensure it's NOT using the EnvFile value
+		if r.ContainsOutput("Server is running on port 9999") {
+			t.Fatalf("Env did not override EnvFile - still using EnvFile value, got output: %s", r.GetOutput())
+		}
+	})
 }
