@@ -29,10 +29,11 @@ func TestMain(m *testing.M) {
     if err := p.Run(); err != nil {
         panic("Failed to start server: " + err.Error())
     }
-    defer p.Stop()
-
-    // Run tests
-    os.Exit(m.Run())
+    
+    code := m.Run()
+    
+    p.Stop()
+    os.Exit(code)
 }
 
 func TestAPI(t *testing.T) {
