@@ -17,11 +17,11 @@ func TestProcessSingleRun(t *testing.T) {
 	r := goatest.Process{
 		File: "test/cmd/single_process/main.go",
 		Env: map[string]string{
-			"PORT": "1010",
+			"PORT": "8010",
 		},
 		LogStream: out,
 		WaitingFor: func(output string) bool {
-			return strings.Contains(output, "Hello, World! 1010")
+			return strings.Contains(output, "Hello, World! 8010")
 		},
 	}
 
@@ -30,8 +30,8 @@ func TestProcessSingleRun(t *testing.T) {
 	}
 	defer r.Stop()
 
-	if !strings.Contains(out.String(), "Hello, World! 1010") {
-		t.Fatalf("expected output 'Hello, World! 1010', got: %s", out.String())
+	if !strings.Contains(out.String(), "Hello, World! 8010") {
+		t.Fatalf("expected output 'Hello, World! 8010', got: %s", out.String())
 	}
 }
 
@@ -60,11 +60,11 @@ func TestProcessRESTAPI(t *testing.T) {
 	r := goatest.Process{
 		File: "test/cmd/rest_api/main.go",
 		Env: map[string]string{
-			"PORT": "1010",
+			"PORT": "8010",
 		},
 		LogStream: os.Stdout,
 		WaitingFor: func(output string) bool {
-			return strings.Contains(output, "Server is running on port 1010")
+			return strings.Contains(output, "Server is running on port 8010")
 		},
 	}
 
@@ -75,13 +75,13 @@ func TestProcessRESTAPI(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:1010/", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:8010/", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("failed to get http://localhost:1010/: %v", err)
+		t.Fatalf("failed to get http://localhost:8010/: %v", err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -96,7 +96,7 @@ func TestProcessOutputAssertions(t *testing.T) {
 	r := goatest.Process{
 		File: "test/cmd/rest_api/main.go",
 		Env: map[string]string{
-			"PORT": "1011",
+			"PORT": "8011",
 		},
 		LogStream: os.Stdout,
 	}
@@ -106,23 +106,23 @@ func TestProcessOutputAssertions(t *testing.T) {
 	}
 	defer r.Stop()
 
-	if !r.WaitForOutput("Server is running on port 1011", 5*time.Second) {
+	if !r.WaitForOutput("Server is running on port 8011", 5*time.Second) {
 		t.Fatalf("expected output not found, got: %s", r.GetOutput())
 	}
 
-	if !r.ContainsOutput("Server is running on port 1011") {
-		t.Fatalf("expected output to contain 'Server is running on port 1011', got: %s", r.GetOutput())
+	if !r.ContainsOutput("Server is running on port 8011") {
+		t.Fatalf("expected output to contain 'Server is running on port 8011', got: %s", r.GetOutput())
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:1011/", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:8011/", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("failed to get http://localhost:1011/: %v", err)
+		t.Fatalf("failed to get http://localhost:8011/: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -135,7 +135,7 @@ func TestProcessCaptureOnly(t *testing.T) {
 	r := goatest.Process{
 		File: "test/cmd/rest_api/main.go",
 		Env: map[string]string{
-			"PORT": "1012",
+			"PORT": "8012",
 		},
 		LogStream: nil,
 	}
@@ -153,7 +153,7 @@ func TestProcessCaptureOnly(t *testing.T) {
 
 	found := false
 	for _, line := range lines {
-		if strings.Contains(line, "Server is running on port 1012") {
+		if strings.Contains(line, "Server is running on port 8012") {
 			found = true
 			break
 		}
@@ -164,7 +164,7 @@ func TestProcessCaptureOnly(t *testing.T) {
 	}
 
 	completeOutput := r.GetOutput()
-	if !strings.Contains(completeOutput, "Server is running on port 1012") {
+	if !strings.Contains(completeOutput, "Server is running on port 8012") {
 		t.Fatalf("complete output does not contain expected text: %s", completeOutput)
 	}
 }
@@ -173,11 +173,11 @@ func TestProcessWithWaitingFor(t *testing.T) {
 	r := goatest.Process{
 		File: "test/cmd/rest_api/main.go",
 		Env: map[string]string{
-			"PORT": "1013",
+			"PORT": "8013",
 		},
 		LogStream: os.Stdout,
 		WaitingFor: func(output string) bool {
-			return strings.Contains(output, "Server is running on port 1013")
+			return strings.Contains(output, "Server is running on port 8013")
 		},
 	}
 
@@ -186,19 +186,19 @@ func TestProcessWithWaitingFor(t *testing.T) {
 	}
 	defer r.Stop()
 
-	if !r.ContainsOutput("Server is running on port 1013") {
+	if !r.ContainsOutput("Server is running on port 8013") {
 		t.Fatalf("expected output not found after WaitingFor condition: %s", r.GetOutput())
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:1013/", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:8013/", nil)
 	if err != nil {
 		t.Fatalf("failed to create request: %v", err)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("failed to get http://localhost:1013/: %v", err)
+		t.Fatalf("failed to get http://localhost:8013/: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -211,7 +211,7 @@ func TestProcessMultiplePatterns(t *testing.T) {
 	r := goatest.Process{
 		File: "test/cmd/rest_api/main.go",
 		Env: map[string]string{
-			"PORT": "1014",
+			"PORT": "8014",
 		},
 		LogStream: os.Stdout,
 	}
@@ -226,8 +226,8 @@ func TestProcessMultiplePatterns(t *testing.T) {
 	}
 
 	patterns := []string{
-		"Server is running on port 1014",
-		"1014",
+		"Server is running on port 8014",
+		"8014",
 	}
 
 	for _, pattern := range patterns {
@@ -241,7 +241,7 @@ func TestProcessResetOutput(t *testing.T) {
 	r := goatest.Process{
 		File: "test/cmd/rest_api/main.go",
 		Env: map[string]string{
-			"PORT": "1015",
+			"PORT": "8015",
 		},
 		LogStream: nil,
 	}
@@ -275,12 +275,12 @@ func TestProcessEnvOverride(t *testing.T) {
 	r := goatest.Process{
 		File: "test/cmd/rest_api/main.go",
 		Env: map[string]string{
-			"PORT": "1016",
+			"PORT": "8016",
 		},
 		EnvFile:   "test/data/.env.test",
 		LogStream: nil,
 		WaitingFor: func(output string) bool {
-			return strings.Contains(output, "Server is running on port 1016")
+			return strings.Contains(output, "Server is running on port 8016")
 		},
 	}
 
@@ -289,7 +289,7 @@ func TestProcessEnvOverride(t *testing.T) {
 	}
 	defer r.Stop()
 
-	if !r.ContainsOutput("Server is running on port 1016") {
+	if !r.ContainsOutput("Server is running on port 8016") {
 		t.Fatalf("expected Env to override EnvFile, got output: %s", r.GetOutput())
 	}
 
