@@ -23,56 +23,9 @@ Pull requests are the best way to propose changes to the codebase. We actively w
 5. Make sure your code lints.
 6. Issue that pull request!
 
-## Conventional Commits
+## Commit Messages
 
-This project follows the [Conventional Commits](https://www.conventionalcommits.org/) specification. All commit messages should be structured as follows:
-
-```
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-### Types
-
-- **feat**: A new feature
-- **fix**: A bug fix
-- **docs**: Documentation only changes
-- **style**: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)
-- **refactor**: A code change that neither fixes a bug nor adds a feature
-- **perf**: A code change that improves performance
-- **test**: Adding missing tests or correcting existing tests
-- **build**: Changes that affect the build system or external dependencies
-- **ci**: Changes to our CI configuration files and scripts
-- **chore**: Other changes that don't modify src or test files
-- **revert**: Reverts a previous commit
-
-### Examples
-
-```
-feat: add support for custom environment variables
-fix: resolve race condition in process startup
-docs: update README with new examples
-test: add integration tests for envfile loading
-```
-
-### Breaking Changes
-
-Breaking changes should be indicated by an exclamation mark before the colon and/or a footer:
-
-```
-feat!: change Process struct field names
-```
-
-or
-
-```
-feat: change Process struct field names
-
-BREAKING CHANGE: The Process struct field names have been updated for consistency.
-```
+Please write clear and descriptive commit messages that explain what changes were made and why. Good commit messages help maintain a clear project history.
 
 ## Code Style
 
