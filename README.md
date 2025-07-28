@@ -15,6 +15,7 @@ func TestMain(m *testing.M) {
     // Start your application
     p := &goatest.Process{
         File:    "cmd/server/main.go",
+        WorkDir: "/path/to/project",   // Optional: set working directory
         EnvFile: ".env.test",
         Env: map[string]string{
             "PORT": "8080",        // Env overrides EnvFile
@@ -50,9 +51,63 @@ func TestAPI(t *testing.T) {
 }
 ```
 
+## Working Directory Control
+
+Set a custom working directory for your process. Useful when testing applications that need to run from a specific directory:
+
+```go
+import (
+    "github.com/cappivara/goatest"
+    "github.com/cappivara/goatest/workdir"
+)
+
+func TestWithProjectRoot(t *testing.T) {
+    // Use the workdir helper to find project root
+    projectRoot, err := workdir.ProjectRoot()
+    if err != nil {
+        t.Fatal(err)
+    }
+    
+    p := &goatest.Process{
+        File:    "cmd/server/main.go",
+        WorkDir: projectRoot,          // Run from project root
+        Env: map[string]string{
+            "PORT": "8080",
+        },
+        WaitingFor: func(output string) bool {
+            return strings.Contains(output, "Server ready")
+        },
+    }
+    
+    if err := p.Run(); err != nil {
+        t.Fatal(err)
+    }
+    defer p.Stop()
+    
+    // Your tests here...
+}
+
+func TestWithCustomDir(t *testing.T) {
+    p := &goatest.Process{
+        File:    "main.go",
+        WorkDir: "/custom/path",       // Explicit path (must exist)
+        Env: map[string]string{
+            "PORT": "8081",
+        },
+    }
+    
+    // WorkDir validation: returns error if directory doesn't exist
+    if err := p.Run(); err != nil {
+        t.Fatal(err)
+    }
+    defer p.Stop()
+}
+```
+
 ## Features
 
 - **Process Management** - Start and stop Go applications in tests
+- **Working Directory Control** - Set custom working directory for processes
 - **Environment Control** - Set environment variables via `Env` map or `.env` files
 - **Output Capture** - Capture and assert on application output
 - **Ready Detection** - Wait for specific output before proceeding
@@ -65,6 +120,7 @@ func TestAPI(t *testing.T) {
 | Field | Type | Description |
 |-------|------|-------------|
 | `File` | `string` | Path to the Go file to run |
+| `WorkDir` | `string` | Working directory for the process (empty = current dir) |
 | `Env` | `map[string]string` | Environment variables (overrides EnvFile) |
 | `EnvFile` | `string` | Path to `.env` file |
 | `LogStream` | `io.Writer` | Where to write output (nil = capture only) |
@@ -77,6 +133,12 @@ func TestAPI(t *testing.T) {
 - `GetOutput() string` - Get captured output
 - `ContainsOutput(string) bool` - Check if output contains text
 - `WaitForOutput(string, time.Duration) bool` - Wait for specific output
+
+### workdir Package
+
+The `workdir` package provides utilities for working directory management:
+
+- `ProjectRoot() (string, error)` - Find project root by searching for `go.mod` file up the directory tree (max 30 iterations)
 
 ## License
 

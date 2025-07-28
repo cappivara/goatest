@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cappivara/goatest"
+	"github.com/cappivara/goatest/workdir"
 )
 
 func TestProcessSingleRun(t *testing.T) {
@@ -295,5 +296,76 @@ func TestProcessEnvOverride(t *testing.T) {
 
 	if r.ContainsOutput("Server is running on port 9999") {
 		t.Fatalf("Env did not override EnvFile - still using EnvFile value, got output: %s", r.GetOutput())
+	}
+}
+
+func TestWithWorkDir(t *testing.T) {
+	projectRoot, err := workdir.ProjectRoot()
+	if err != nil {
+		t.Fatalf("failed to get project root: %v", err)
+	}
+
+	p := goatest.Process{
+		WorkDir: projectRoot + "/test",
+		File:    "cmd/rest_api/main.go",
+		Env: map[string]string{
+			"PORT": "8016",
+		},
+		EnvFile:   "test/data/.env.test",
+		LogStream: nil,
+		WaitingFor: func(output string) bool {
+			return strings.Contains(output, "Server is running on port 8016")
+		},
+	}
+
+	if err := p.Run(); err != nil {
+		t.Fatalf("failed to run: %v", err)
+	}
+	defer p.Stop()
+}
+
+func TestProcessWithInvalidWorkDir(t *testing.T) {
+	p := goatest.Process{
+		WorkDir: "/nonexistent/directory",
+		File:    "cmd/rest_api/main.go",
+		Env: map[string]string{
+			"PORT": "8017",
+		},
+	}
+
+	err := p.Run()
+	if err == nil {
+		defer p.Stop()
+		t.Fatal("expected error for nonexistent WorkDir, got nil")
+	}
+
+	expectedErrMsg := "workdir does not exist: /nonexistent/directory"
+	if err.Error() != expectedErrMsg {
+		t.Errorf("expected error message %q, got %q", expectedErrMsg, err.Error())
+	}
+}
+
+func TestProcessWithEmptyWorkDir(t *testing.T) {
+	out := &strings.Builder{}
+
+	p := goatest.Process{
+		WorkDir: "", // Empty WorkDir should use current directory behavior
+		File:    "test/cmd/single_process/main.go",
+		Env: map[string]string{
+			"PORT": "8018",
+		},
+		LogStream: out,
+		WaitingFor: func(output string) bool {
+			return strings.Contains(output, "Hello, World! 8018")
+		},
+	}
+
+	if err := p.Run(); err != nil {
+		t.Fatalf("failed to run: %v", err)
+	}
+	defer p.Stop()
+
+	if !strings.Contains(out.String(), "Hello, World! 8018") {
+		t.Fatalf("expected output 'Hello, World! 8018', got: %s", out.String())
 	}
 }
