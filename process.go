@@ -15,6 +15,7 @@ import (
 // Process manages the lifecycle of a background Go process
 type Process struct {
 	File       string
+	WorkDir    string
 	Env        map[string]string
 	EnvFile    string
 	LogStream  io.Writer
@@ -115,10 +116,21 @@ func (p *Process) Run() error {
 		p.cmd.Env = append(p.cmd.Env, k+"="+v)
 	}
 
-	// Set working directory to the current directory (runner)
-	if wd, err := os.Getwd(); err == nil {
-		p.cmd.Dir = wd
+	// Set working directory
+	var workDir string
+	if p.WorkDir != "" {
+		// Use specified WorkDir
+		if _, err := os.Stat(p.WorkDir); os.IsNotExist(err) {
+			return fmt.Errorf("workdir does not exist: %s", p.WorkDir)
+		}
+		workDir = p.WorkDir
+	} else {
+		// Use current directory (existing behavior)
+		if wd, err := os.Getwd(); err == nil {
+			workDir = wd
+		}
 	}
+	p.cmd.Dir = workDir
 
 	// Set process group to enable killing the entire process tree
 	p.cmd.SysProcAttr = &syscall.SysProcAttr{
